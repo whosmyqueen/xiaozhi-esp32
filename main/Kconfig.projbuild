@@ -26,13 +26,15 @@ endchoice
 
 choice CONNECTION_TYPE
     prompt "Connection Type"
-    default CONNECTION_TYPE_MQTT_UDP
+    default CONNECTION_TYPE_AGORA_RTC
     help
         网络数据传输协议
     config CONNECTION_TYPE_MQTT_UDP
         bool "MQTT + UDP"
     config CONNECTION_TYPE_WEBSOCKET
         bool "Websocket"
+    config CONNECTION_TYPE_AGORA_RTC
+        bool "声网 RTC"
 endchoice
 
 config WEBSOCKET_URL

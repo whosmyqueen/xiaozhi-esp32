@@ -24,6 +24,8 @@ dependencies:
     version: "^1.0.0"
     rules:
       - if: 'idf_version >= "5.4.0"'
+  agora_iot_sdk:
+    path: ../components/agora_iot_sdk  
   ## Required IDF version
   idf:
     version: ">=5.3"
