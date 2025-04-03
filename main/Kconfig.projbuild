@@ -34,7 +34,7 @@ choice CONNECTION_TYPE
     config CONNECTION_TYPE_WEBSOCKET
         bool "Websocket"
     config CONNECTION_TYPE_AGORA_RTC
-        bool "声网 RTC"
+        bool "Agora RTC"
 endchoice
 
 config WEBSOCKET_URL

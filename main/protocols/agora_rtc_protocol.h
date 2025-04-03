@@ -1,15 +1,15 @@
-#ifndef _RTC_PROTOCOL_H_
-#define _RTC_PROTOCOL_H_
+#ifndef _AGORA_RTC_PROTOCOL_H_
+#define _AGORA_RTC_PROTOCOL_H_
 
 #include "protocol.h"
 #include "agora_rtc_api.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 
-class RtcProtocol : public Protocol {
+class AgoraRtcProtocol : public Protocol {
 public:
-  RtcProtocol();
-  ~RtcProtocol();
+  AgoraRtcProtocol();
+  ~AgoraRtcProtocol();
 
   void Start() override;
   void SendAudio(const std::vector<uint8_t> &data) override;
