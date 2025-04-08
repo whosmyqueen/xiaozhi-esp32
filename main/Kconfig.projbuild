@@ -51,6 +51,20 @@ config WEBSOCKET_ACCESS_TOKEN
     help
         Access token for websocket communication.
 
+config REALTIME_SERVER_URL
+    depends on CONNECTION_TYPE_AGORA_RTC
+    string "Realtime Server URL"
+    default "https://rtc.senseflow-test.sensetime.com/api/"
+    help
+        Realtime Server Base Url.
+
+config SENSEFLOW_APP_KEY
+    depends on CONNECTION_TYPE_AGORA_RTC
+    string "Senseflow App Key"
+    default "app-2N0KwAz2KEO1tc0e2ElxGbPl"
+    help
+        Senseflow App Key.
+
 choice BOARD_TYPE
     prompt "Board Type"
     default BOARD_TYPE_BREAD_COMPACT_WIFI

@@ -9,6 +9,7 @@
 
 #include "led/led.h"
 #include "backlight.h"
+#include "cJSON.h"
 
 void* create_board();
 class AudioCodec;
@@ -47,6 +48,7 @@ public:
     virtual const char* GetNetworkStateIcon() = 0;
     virtual bool GetBatteryLevel(int &level, bool& charging, bool& discharging);
     virtual std::string GetJson();
+    virtual std::string GetRealtimeJson();
     virtual void SetPowerSaveMode(bool enabled) = 0;
 };
 

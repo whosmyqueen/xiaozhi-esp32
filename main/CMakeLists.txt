@@ -145,6 +145,8 @@ if(CONFIG_CONNECTION_TYPE_MQTT_UDP)
     list(APPEND SOURCES "protocols/mqtt_protocol.cc")
 elseif(CONFIG_CONNECTION_TYPE_WEBSOCKET)
     list(APPEND SOURCES "protocols/websocket_protocol.cc")
+elseif(CONFIG_CONNECTION_TYPE_AGORA_RTC)
+    list(APPEND SOURCES "protocols/agora_rtc_protocol.cc")
 endif()
 
 if(CONFIG_USE_AUDIO_PROCESSOR)
