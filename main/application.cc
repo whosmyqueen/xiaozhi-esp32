@@ -17,7 +17,6 @@
 #include <esp_app_desc.h>
 #include <esp_log.h>
 
-
 #define TAG "Application"
 
 static const char* const STATE_STRINGS[] = {"unknown",  "starting",  "configuring", "idle",        "connecting",   "listening",
@@ -153,13 +152,13 @@ void Application::CheckRealtileConfig() {
 	auto& board = Board::GetInstance();
 	auto display = board.GetDisplay();
 	// Check if there is a new firmware version available
-	ota_.SetPostData(board.GetJson());
+	realtime_.SetPostData(board.GetRealtimeJson());
 
 	const int MAX_RETRY = 10;
 	int retry_count = 0;
 
 	while (true) {
-		if (!ota_.CheckVersion()) {
+		if (!realtime_.StartRealtime()) {
 			retry_count++;
 			if (retry_count >= MAX_RETRY) {
 				ESP_LOGE(TAG, "Too many retries, exit version check");
@@ -170,75 +169,25 @@ void Application::CheckRealtileConfig() {
 			continue;
 		}
 		retry_count = 0;
-
-		if (ota_.HasNewVersion()) {
-			Alert(Lang::Strings::OTA_UPGRADE, Lang::Strings::UPGRADING, "happy", Lang::Sounds::P3_UPGRADE);
-			// Wait for the chat state to be idle
-			do {
-				vTaskDelay(pdMS_TO_TICKS(3000));
-			} while (GetDeviceState() != kDeviceStateIdle);
-
-			// Use main task to do the upgrade, not cancelable
-			Schedule([this, display]() {
-				SetDeviceState(kDeviceStateUpgrading);
-
-				display->SetIcon(FONT_AWESOME_DOWNLOAD);
-				std::string message = std::string(Lang::Strings::NEW_VERSION) + ota_.GetFirmwareVersion();
-				display->SetChatMessage("system", message.c_str());
-
-				auto& board = Board::GetInstance();
-				board.SetPowerSaveMode(false);
-#if CONFIG_USE_WAKE_WORD_DETECT
-				wake_word_detect_.StopDetection();
-#endif
-				// 预先关闭音频输出，避免升级过程有音频操作
-				auto codec = board.GetAudioCodec();
-				codec->EnableInput(false);
-				codec->EnableOutput(false);
-				{
-					std::lock_guard<std::mutex> lock(mutex_);
-					audio_decode_queue_.clear();
-				}
-				background_task_->WaitForCompletion();
-				delete background_task_;
-				background_task_ = nullptr;
-				vTaskDelay(pdMS_TO_TICKS(1000));
-
-				ota_.StartUpgrade([display](int progress, size_t speed) {
-					char buffer[64];
-					snprintf(buffer, sizeof(buffer), "%d%% %zuKB/s", progress, speed / 1024);
-					display->SetChatMessage("system", buffer);
-				});
-
-				// If upgrade success, the device will reboot and never reach here
-				display->SetStatus(Lang::Strings::UPGRADE_FAILED);
-				ESP_LOGI(TAG, "Firmware upgrade failed...");
-				vTaskDelay(pdMS_TO_TICKS(3000));
-				Reboot();
-			});
-
-			return;
-		}
-
 		// No new version, mark the current version as valid
-		ota_.MarkCurrentVersionValid();
-		std::string message = std::string(Lang::Strings::VERSION) + ota_.GetCurrentVersion();
+		realtime_.MarkCurrentVersionValid();
+		std::string message = std::string(Lang::Strings::VERSION) + realtime_.GetCurrentVersion();
 		display->ShowNotification(message.c_str());
 
-		if (ota_.HasActivationCode()) {
-			// Activation code is valid
-			SetDeviceState(kDeviceStateActivating);
-			ShowActivationCode();
+		// if (ota_.HasActivationCode()) {
+		// 	// Activation code is valid
+		// 	SetDeviceState(kDeviceStateActivating);
+		// 	ShowActivationCode();
 
-			// Check again in 60 seconds or until the device is idle
-			for (int i = 0; i < 60; ++i) {
-				if (device_state_ == kDeviceStateIdle) {
-					break;
-				}
-				vTaskDelay(pdMS_TO_TICKS(1000));
-			}
-			continue;
-		}
+		// 	// Check again in 60 seconds or until the device is idle
+		// 	for (int i = 0; i < 60; ++i) {
+		// 		if (device_state_ == kDeviceStateIdle) {
+		// 			break;
+		// 		}
+		// 		vTaskDelay(pdMS_TO_TICKS(1000));
+		// 	}
+		// 	continue;
+		// }
 
 		SetDeviceState(kDeviceStateIdle);
 		display->SetChatMessage("system", "");
@@ -430,6 +379,33 @@ void Application::Start() {
 	/* Wait for the network to be ready */
 	board.StartNetwork();
 
+	// Check for new firmware version or get the MQTT broker address
+	// ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
+	// ota_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+	// ota_.SetHeader("Client-Id", board.GetUuid());
+	// ota_.SetHeader("Accept-Language", Lang::CODE);
+	// auto app_desc = esp_app_get_description();
+	// ota_.SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
+	// xTaskCreate([](void* arg) {
+	//     Application* app = (Application*)arg;
+	//     app->CheckNewVersion();
+	//     vTaskDelete(NULL);
+	// }, "check_new_version", 4096 * 2, this, 2, nullptr);
+	realtime_.SetCheckVersionUrl(CONFIG_REALTIME_SERVER_URL);
+	realtime_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+	realtime_.SetHeader("Client-Id", board.GetUuid());
+	realtime_.SetHeader("Authorization", "Bearer " + board.GetUuid());
+	realtime_.SetHeader("Accept-Language", Lang::CODE);
+	auto app_desc = esp_app_get_description();
+	realtime_.SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
+	xTaskCreate(
+	    [](void* arg) {
+		    Application* app = (Application*)arg;
+		    app->CheckNewVersion();
+		    vTaskDelete(NULL);
+	    },
+	    "check_new_version", 4096 * 2, this, 2, nullptr);
+
 	// Initialize the protocol
 	display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
 #if defined(CONFIG_CONNECTION_TYPE_WEBSOCKET)
@@ -524,27 +500,6 @@ void Application::Start() {
 		}
 	});
 	protocol_->Start();
-
-	// Check for new firmware version or get the MQTT broker address
-	ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
-	ota_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
-	ota_.SetHeader("Client-Id", board.GetUuid());
-	ota_.SetHeader("Accept-Language", Lang::CODE);
-	auto app_desc = esp_app_get_description();
-	ota_.SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
-
-	// xTaskCreate([](void* arg) {
-	//     Application* app = (Application*)arg;
-	//     app->CheckNewVersion();
-	//     vTaskDelete(NULL);
-	// }, "check_new_version", 4096 * 2, this, 2, nullptr);
-	xTaskCreate(
-	    [](void* arg) {
-		    Application* app = (Application*)arg;
-		    app->CheckNewVersion();
-		    vTaskDelete(NULL);
-	    },
-	    "check_new_version", 4096 * 2, this, 2, nullptr);
 
 #if CONFIG_USE_AUDIO_PROCESSOR
 	audio_processor_.Initialize(codec, realtime_chat_enabled_);
