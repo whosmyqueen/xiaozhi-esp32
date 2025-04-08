@@ -1,15 +1,14 @@
 #include "agora_rtc_protocol.h"
 #include "application.h"
+#include "assets/lang_config.h"
 #include "board.h"
-#include "system_info.h"
+#include "settings.h"
+#include <cstring>
+#include <esp_log.h>
 
 #define TAG "RTC"
 
 AgoraRtcProtocol::AgoraRtcProtocol() {
-    base_url = CONFIG_REALTIME_SERVER_URL;
-	std::string token = "Bearer " + std::string(CONFIG_SENSEFLOW_APP_KEY);
-    headers_["Authorization"] = token;
-    headers_["Content-Type"] = "application/json";
 	event_group_handle_ = xEventGroupCreate();
 	join_event = xEventGroupCreate();
 }
@@ -19,21 +18,20 @@ AgoraRtcProtocol::~AgoraRtcProtocol() {
 	vEventGroupDelete(join_event);
 }
 
-void AgoraRtcProtocol::Start() {
-	std::string url = base_url + "realtime";
-	auto http = Board::GetInstance().CreateHttp();
-}
+void AgoraRtcProtocol::Start() {}
 
 void AgoraRtcProtocol::SendAudio(const std::vector<uint8_t>& data) {}
 
 bool AgoraRtcProtocol::OpenAudioChannel() {
 	error_occurred_ = false;
-	//   std::string url = CONFIG_WEBSOCKET_URL;
-	//   std::string token = "Bearer " +
-	//   std::string(CONFIG_WEBSOCKET_ACCESS_TOKEN);
+	Settings settings("mqtt", false);
+	app_id_ = settings.GetString("app_id");
+	channel_name_ = settings.GetString("channel_name");
+	token_ = settings.GetString("token");
+	room_user_id_ = settings.GetInt("room_user_id");
+	user_ = settings.GetString("user");
 	agora_rtc_event_handler_t handler = {
-	    //   .on_join_channel_success =
-	    //   AgoraRtcProtocol::_on_join_channel_success,
+	    // .on_join_channel_success = AgoraRtcProtocol::_on_join_channel_success,
 	    // .on_connection_lost = __on_connection_lost,
 	    // .on_rejoin_channel_success = __on_rejoin_channel_success,
 	    // .on_user_joined = __on_user_joined,
@@ -52,7 +50,8 @@ bool AgoraRtcProtocol::OpenAudioChannel() {
 	service_opt.log_cfg.log_level = RTC_LOG_WARNING;
 	service_opt.license_value[0] = '\0';
 	service_opt.domain_limit = false;
-	int rval = agora_rtc_init(g_app.app_id, &handler, &service_opt);
+	int rval = agora_rtc_init(app_id_, &handler, &service_opt);
+	
 	return false;
 }
 

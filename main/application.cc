@@ -1,5 +1,4 @@
 #include "application.h"
-#include "agora_rtc_protocol.h"
 #include "assets/lang_config.h"
 #include "audio_codec.h"
 #include "board.h"
@@ -130,13 +129,59 @@ void Application::CheckNewVersion() {
 			SetDeviceState(kDeviceStateActivating);
 			ShowActivationCode();
 
-        SetDeviceState(kDeviceStateIdle);
-        display->SetChatMessage("system", "");
-        ResetDecoder();
-        PlaySound(Lang::Sounds::P3_SUCCESS);
-        // Exit the loop if upgrade or idle
-        break;
-    }
+			// Check again in 60 seconds or until the device is idle
+			for (int i = 0; i < 60; ++i) {
+				if (device_state_ == kDeviceStateIdle) {
+					break;
+				}
+				vTaskDelay(pdMS_TO_TICKS(1000));
+			}
+			continue;
+		}
+
+		SetDeviceState(kDeviceStateIdle);
+		display->SetChatMessage("system", "");
+		ResetDecoder();
+		PlaySound(Lang::Sounds::P3_SUCCESS);
+		// Exit the loop if upgrade or idle
+		break;
+	}
+}
+
+void Application::CheckRealtileConfig() {
+	auto& board = Board::GetInstance();
+	auto display = board.GetDisplay();
+	// Check if there is a new firmware version available
+	realtime_.SetPostData(board.GetRealtimeJson());
+
+	const int MAX_RETRY = 10;
+	int retry_count = 0;
+
+	while (true) {
+		if (!realtime_.StartRealtime()) {
+			retry_count++;
+			if (retry_count >= MAX_RETRY) {
+				ESP_LOGE(TAG, "Too many retries, exit version check");
+				return;
+			}
+			ESP_LOGW(TAG, "Check new version failed, retry in %d seconds (%d/%d)", 60, retry_count, MAX_RETRY);
+			vTaskDelay(pdMS_TO_TICKS(60000));
+			continue;
+		}
+		retry_count = 0;
+
+		// No new version, mark the current version as valid
+		realtime_.MarkCurrentVersionValid();
+		std::string message = std::string(Lang::Strings::VERSION) + realtime_.GetCurrentVersion();
+		display->ShowNotification(message.c_str());
+
+		SetDeviceState(kDeviceStateIdle);
+		display->SetChatMessage("system", "");
+		ResetDecoder();
+		PlaySound(Lang::Sounds::P3_SUCCESS);
+		// Exit the loop if upgrade or idle
+		break;
+	}
 }
 
 void Application::ShowActivationCode() {
@@ -321,33 +366,6 @@ void Application::Start() {
 	/* Wait for the network to be ready */
 	board.StartNetwork();
 
-	// Check for new firmware version or get the MQTT broker address
-	// ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
-	// ota_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
-	// ota_.SetHeader("Client-Id", board.GetUuid());
-	// ota_.SetHeader("Accept-Language", Lang::CODE);
-	// auto app_desc = esp_app_get_description();
-	// ota_.SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
-	// xTaskCreate([](void* arg) {
-	//     Application* app = (Application*)arg;
-	//     app->CheckNewVersion();
-	//     vTaskDelete(NULL);
-	// }, "check_new_version", 4096 * 2, this, 2, nullptr);
-	realtime_.SetCheckVersionUrl(CONFIG_REALTIME_SERVER_URL);
-	realtime_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
-	realtime_.SetHeader("Client-Id", board.GetUuid());
-	realtime_.SetHeader("Authorization", "Bearer " + board.GetUuid());
-	realtime_.SetHeader("Accept-Language", Lang::CODE);
-	auto app_desc = esp_app_get_description();
-	realtime_.SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
-	xTaskCreate(
-	    [](void* arg) {
-		    Application* app = (Application*)arg;
-		    app->CheckNewVersion();
-		    vTaskDelete(NULL);
-	    },
-	    "check_new_version", 4096 * 2, this, 2, nullptr);
-
 	// Initialize the protocol
 	display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
 #if defined(CONFIG_CONNECTION_TYPE_WEBSOCKET)
@@ -442,6 +460,38 @@ void Application::Start() {
 		}
 	});
 	protocol_->Start();
+
+	// Check for new firmware version or get the MQTT broker address
+	// ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
+	// ota_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+	// ota_.SetHeader("Client-Id", board.GetUuid());
+	// ota_.SetHeader("Accept-Language", Lang::CODE);
+	// auto app_desc = esp_app_get_description();
+	// ota_.SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
+
+	// xTaskCreate(
+	//     [](void* arg) {
+	// 	    Application* app = (Application*)arg;
+	// 	    app->CheckNewVersion();
+	// 	    vTaskDelete(NULL);
+	//     },
+	//     "check_new_version", 4096 * 2, this, 2, nullptr);
+	// Check for new firmware version or get the MQTT broker address
+	realtime_.SetCheckVersionUrl(CONFIG_REALTIME_SERVER_URL);
+	realtime_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+	realtime_.SetHeader("Client-Id", board.GetUuid());
+	realtime_.SetHeader("Authorization", std::string("Bearer ") + std::string(CONFIG_SENSEFLOW_APP_KEY));
+	realtime_.SetHeader("Accept-Language", Lang::CODE);
+	auto app_desc = esp_app_get_description();
+	realtime_.SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
+
+	xTaskCreate(
+	    [](void* arg) {
+		    Application* app = (Application*)arg;
+		    app->CheckRealtileConfig();
+		    vTaskDelete(NULL);
+	    },
+	    "check_realtime_config", 4096 * 2, this, 2, nullptr);
 
 #if CONFIG_USE_AUDIO_PROCESSOR
 	audio_processor_.Initialize(codec, realtime_chat_enabled_);

@@ -3,6 +3,15 @@
 
 #include "agora_rtc_api.h"
 #include "protocol.h"
+#include <cJSON.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/event_groups.h>
+
+#include <functional>
+#include <string>
+#include <map>
+#include <mutex>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 
@@ -20,10 +29,13 @@ public:
 	bool IsAudioChannelOpened() const override;
 
 private:
-	std::map<std::string, std::string> headers_;
-	std::string base_url;
 	EventGroupHandle_t event_group_handle_;
 	EventGroupHandle_t join_event;
+	std::string app_id_;
+    std::string channel_name_;
+    std::string token_;
+    int room_user_id_;
+    std::string user_;
 
 	void ParseServerHello(const cJSON* root);
 	void SendText(const std::string& text) override;

@@ -42,7 +42,18 @@ bool Realtime::StartRealtime() {
 	http->Close();
 	delete http;
 
-	// Response: { "firmware": { "version": "1.0.0", "url": "http://" } }
+	// Response:
+	/**
+	 {
+	"app_id": "84206182d46d4f80822354e0052c45de",
+	"channel_name": "agora_gbFh8JHnVkqbtxe8PSS7Js",
+	"token":
+"007eJxSYJiVsHXHrQyJum9M370dQude2r9k+qy2Hf9iTZpmmr64nv5PgcHCxMjAzNDCKMXELMUkzcLAwsjI2NQk1cDA1CjZxDQltebxl/SGQEYG3tdhzEwMjAwsDIwMID4TmGQGkyxgUoYhMT2/KDE+Pcktw8LLIy8suzCppCLVIiA42NyrmIvB0MDUwNTC2NDCEGQOxBRkUUAAAAD//z6RMbo=",
+	"room_user_id": 1050583181,
+	"user": "esp-box-user"
+}
+	 *
+	 */
 	// Parse the JSON response and check if the version is newer
 	// If it is, set has_new_version_ to true and store the new version and URL
 
@@ -57,14 +68,6 @@ bool Realtime::StartRealtime() {
 	cJSON* message = cJSON_GetObjectItem(root, "message");
 	if (code == NULL && message == NULL) {
 		Settings settings("realtime_config", true);
-		cJSON* item = NULL;
-		cJSON_ArrayForEach(item, root) {
-			if (item->type == cJSON_String) {
-				if (settings.GetString(item->string) != item->valuestring) {
-					settings.SetString(item->string, item->valuestring);
-				}
-			}
-		}
 		cJSON* app_id = cJSON_GetObjectItem(root, "app_id");
 		cJSON* channel_name = cJSON_GetObjectItem(root, "channel_name");
 		cJSON* token = cJSON_GetObjectItem(root, "token");
@@ -83,21 +86,21 @@ bool Realtime::StartRealtime() {
 }
 
 void Realtime::MarkCurrentVersionValid() {
-    auto partition = esp_ota_get_running_partition();
-    if (strcmp(partition->label, "factory") == 0) {
-        ESP_LOGI(TAG, "Running from factory partition, skipping");
-        return;
-    }
+	auto partition = esp_ota_get_running_partition();
+	if (strcmp(partition->label, "factory") == 0) {
+		ESP_LOGI(TAG, "Running from factory partition, skipping");
+		return;
+	}
 
-    ESP_LOGI(TAG, "Running partition: %s", partition->label);
-    esp_ota_img_states_t state;
-    if (esp_ota_get_state_partition(partition, &state) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get state of partition");
-        return;
-    }
+	ESP_LOGI(TAG, "Running partition: %s", partition->label);
+	esp_ota_img_states_t state;
+	if (esp_ota_get_state_partition(partition, &state) != ESP_OK) {
+		ESP_LOGE(TAG, "Failed to get state of partition");
+		return;
+	}
 
-    if (state == ESP_OTA_IMG_PENDING_VERIFY) {
-        ESP_LOGI(TAG, "Marking firmware as valid");
-        esp_ota_mark_app_valid_cancel_rollback();
-    }
+	if (state == ESP_OTA_IMG_PENDING_VERIFY) {
+		ESP_LOGI(TAG, "Marking firmware as valid");
+		esp_ota_mark_app_valid_cancel_rollback();
+	}
 }
