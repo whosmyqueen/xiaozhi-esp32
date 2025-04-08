@@ -130,71 +130,13 @@ void Application::CheckNewVersion() {
 			SetDeviceState(kDeviceStateActivating);
 			ShowActivationCode();
 
-			// Check again in 60 seconds or until the device is idle
-			for (int i = 0; i < 60; ++i) {
-				if (device_state_ == kDeviceStateIdle) {
-					break;
-				}
-				vTaskDelay(pdMS_TO_TICKS(1000));
-			}
-			continue;
-		}
-
-		SetDeviceState(kDeviceStateIdle);
-		display->SetChatMessage("system", "");
-		PlaySound(Lang::Sounds::P3_SUCCESS);
-		// Exit the loop if upgrade or idle
-		break;
-	}
-}
-
-void Application::CheckRealtileConfig() {
-	auto& board = Board::GetInstance();
-	auto display = board.GetDisplay();
-	// Check if there is a new firmware version available
-	realtime_.SetPostData(board.GetRealtimeJson());
-
-	const int MAX_RETRY = 10;
-	int retry_count = 0;
-
-	while (true) {
-		if (!realtime_.StartRealtime()) {
-			retry_count++;
-			if (retry_count >= MAX_RETRY) {
-				ESP_LOGE(TAG, "Too many retries, exit version check");
-				return;
-			}
-			ESP_LOGW(TAG, "Check new version failed, retry in %d seconds (%d/%d)", 60, retry_count, MAX_RETRY);
-			vTaskDelay(pdMS_TO_TICKS(60000));
-			continue;
-		}
-		retry_count = 0;
-		// No new version, mark the current version as valid
-		realtime_.MarkCurrentVersionValid();
-		std::string message = std::string(Lang::Strings::VERSION) + realtime_.GetCurrentVersion();
-		display->ShowNotification(message.c_str());
-
-		// if (ota_.HasActivationCode()) {
-		// 	// Activation code is valid
-		// 	SetDeviceState(kDeviceStateActivating);
-		// 	ShowActivationCode();
-
-		// 	// Check again in 60 seconds or until the device is idle
-		// 	for (int i = 0; i < 60; ++i) {
-		// 		if (device_state_ == kDeviceStateIdle) {
-		// 			break;
-		// 		}
-		// 		vTaskDelay(pdMS_TO_TICKS(1000));
-		// 	}
-		// 	continue;
-		// }
-
-		SetDeviceState(kDeviceStateIdle);
-		display->SetChatMessage("system", "");
-		PlaySound(Lang::Sounds::P3_SUCCESS);
-		// Exit the loop if upgrade or idle
-		break;
-	}
+        SetDeviceState(kDeviceStateIdle);
+        display->SetChatMessage("system", "");
+        ResetDecoder();
+        PlaySound(Lang::Sounds::P3_SUCCESS);
+        // Exit the loop if upgrade or idle
+        break;
+    }
 }
 
 void Application::ShowActivationCode() {
