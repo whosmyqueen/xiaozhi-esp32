@@ -6,14 +6,10 @@
 #include <cJSON.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
-
 #include <functional>
-#include <string>
 #include <map>
 #include <mutex>
-
-#include <freertos/FreeRTOS.h>
-#include <freertos/event_groups.h>
+#include <string>
 
 #define JOIN_EVENT_BIT (1 << 0)
 
@@ -30,17 +26,20 @@ public:
 
 private:
 	EventGroupHandle_t event_group_handle_;
-	EventGroupHandle_t join_event;
+	static AgoraRtcProtocol* instance_;
+
 	std::string app_id_;
-    std::string channel_name_;
-    std::string token_;
-    int room_user_id_;
-    std::string user_;
+	std::string channel_name_;
+	std::string token_;
+	int room_user_id_;
+	std::string user_;
+
+	connection_id_t g_conn_id;
 
 	void ParseServerHello(const cJSON* root);
 	void SendText(const std::string& text) override;
-
-	void _on_join_channel_success(connection_id_t conn_id, uint32_t uid, int elapsed);
+	bool StartRtcClient(bool report_error = false);
+	static void _on_join_channel_success(connection_id_t conn_id, uint32_t uid, int elapsed);
 };
 
 #endif
