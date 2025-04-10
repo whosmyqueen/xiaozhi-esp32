@@ -506,10 +506,10 @@ void Application::Start() {
 	xTaskCreate(
 	    [](void* arg) {
 		    Application* app = (Application*)arg;
-		    app->realtime_.PingRealtime();
+		    app->PingServer();
 		    vTaskDelete(NULL);
 	    },
-	    "ping_realtime_config", 4096 * 2, this, 2, nullptr);
+	    "ping_realtime_server", 4096 * 2, this, 2, nullptr);
 
 #if CONFIG_USE_AUDIO_PROCESSOR
 	audio_processor_.Initialize(codec, realtime_chat_enabled_);
