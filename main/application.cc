@@ -1,4 +1,5 @@
 #include "application.h"
+#include "agora_rtc_protocol.h"
 #include "assets/lang_config.h"
 #include "audio_codec.h"
 #include "board.h"
@@ -179,8 +180,19 @@ void Application::CheckRealtileConfig() {
 		display->SetChatMessage("system", "");
 		ResetDecoder();
 		PlaySound(Lang::Sounds::P3_SUCCESS);
+		protocol_->Start();
 		// Exit the loop if upgrade or idle
 		break;
+	}
+}
+
+void Application::PingServer() {
+	while (true) {
+		if (protocol_->IsAudioChannelOpened()) {
+			realtime_.PingRealtime();
+			ESP_LOGI(TAG, "Ping server...");
+		}
+		vTaskDelay(pdMS_TO_TICKS(15 * 1000));
 	}
 }
 
@@ -459,7 +471,6 @@ void Application::Start() {
 			}
 		}
 	});
-	protocol_->Start();
 
 	// Check for new firmware version or get the MQTT broker address
 	// ota_.SetCheckVersionUrl(CONFIG_OTA_VERSION_URL);
@@ -477,7 +488,7 @@ void Application::Start() {
 	//     },
 	//     "check_new_version", 4096 * 2, this, 2, nullptr);
 	// Check for new firmware version or get the MQTT broker address
-	realtime_.SetCheckVersionUrl(CONFIG_REALTIME_SERVER_URL);
+	realtime_.SetRealtileServerUrl(CONFIG_REALTIME_SERVER_URL);
 	realtime_.SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
 	realtime_.SetHeader("Client-Id", board.GetUuid());
 	realtime_.SetHeader("Authorization", std::string("Bearer ") + std::string(CONFIG_SENSEFLOW_APP_KEY));
@@ -492,6 +503,13 @@ void Application::Start() {
 		    vTaskDelete(NULL);
 	    },
 	    "check_realtime_config", 4096 * 2, this, 2, nullptr);
+	xTaskCreate(
+	    [](void* arg) {
+		    Application* app = (Application*)arg;
+		    app->realtime_.PingRealtime();
+		    vTaskDelete(NULL);
+	    },
+	    "ping_realtime_config", 4096 * 2, this, 2, nullptr);
 
 #if CONFIG_USE_AUDIO_PROCESSOR
 	audio_processor_.Initialize(codec, realtime_chat_enabled_);

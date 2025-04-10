@@ -32,7 +32,8 @@ bool Realtime::StartRealtime() {
 
 	http->SetHeader("Content-Type", "application/json");
 	std::string method = post_data_.length() > 0 ? "POST" : "GET";
-	if (!http->Open(method, realtime_server_base_url_ + "realtime", post_data_)) {
+	std::string url = realtime_server_base_url_ + std::string("realtime");
+	if (!http->Open(method, url, post_data_)) {
 		ESP_LOGE(TAG, "Failed to open HTTP connection");
 		delete http;
 		return false;
@@ -41,22 +42,6 @@ bool Realtime::StartRealtime() {
 	auto response = http->GetBody();
 	http->Close();
 	delete http;
-
-	// Response:
-	/**
-	 {
-	"app_id": "84206182d46d4f80822354e0052c45de",
-	"channel_name": "agora_gbFh8JHnVkqbtxe8PSS7Js",
-	"token":
-"007eJxSYJiVsHXHrQyJum9M370dQude2r9k+qy2Hf9iTZpmmr64nv5PgcHCxMjAzNDCKMXELMUkzcLAwsjI2NQk1cDA1CjZxDQltebxl/SGQEYG3tdhzEwMjAwsDIwMID4TmGQGkyxgUoYhMT2/KDE+Pcktw8LLIy8suzCppCLVIiA42NyrmIvB0MDUwNTC2NDCEGQOxBRkUUAAAAD//z6RMbo=",
-	"room_user_id": 1050583181,
-	"user": "esp-box-user"
-}
-	 *
-	 */
-	// Parse the JSON response and check if the version is newer
-	// If it is, set has_new_version_ to true and store the new version and URL
-
 	cJSON* root = cJSON_Parse(response.c_str());
 	if (root == NULL) {
 		ESP_LOGE(TAG, "Failed to parse JSON response");
@@ -79,6 +64,44 @@ bool Realtime::StartRealtime() {
 		settings.SetInt("room_user_id", room_user_id->valueint);
 		settings.SetString("user", user->valuestring);
 		has_config_ = true;
+	}
+
+	cJSON_Delete(root);
+	return true;
+}
+
+bool Realtime::PingRealtime() {
+
+	auto http = Board::GetInstance().CreateHttp();
+	for (const auto& header : headers_) {
+		http->SetHeader(header.first, header.second);
+	}
+	http->SetHeader("Content-Type", "application/json");
+	Settings settings("realtime_config", false);
+	std::string url =
+	    realtime_server_base_url_ + "realtime/" + settings.GetString("channel_name") + "/ping?user=" + settings.GetString("user");
+	if (!http->Open("GET", url)) {
+		ESP_LOGE(TAG, "Failed to open HTTP connection");
+		delete http;
+		return false;
+	}
+
+	auto response = http->GetBody();
+	http->Close();
+	delete http;
+	cJSON* root = cJSON_Parse(response.c_str());
+	if (root == NULL) {
+		ESP_LOGE(TAG, "Failed to parse JSON response");
+		return false;
+	}
+
+	has_config_ = false;
+	cJSON* code = cJSON_GetObjectItem(root, "code");
+	cJSON* message = cJSON_GetObjectItem(root, "message");
+	if (code != NULL || message != NULL) {
+		ESP_LOGE(TAG, "Failed to ping realtime server: %s", message->valuestring);
+		cJSON_Delete(root);
+		return false;
 	}
 
 	cJSON_Delete(root);

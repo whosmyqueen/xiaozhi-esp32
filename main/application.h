@@ -16,7 +16,7 @@
 
 #include "protocol.h"
 #include "ota.h"
-#include "Realtime.h"
+#include "realtime.h"
 #include "background_task.h"
 
 #if CONFIG_USE_WAKE_WORD_DETECT
@@ -104,6 +104,7 @@ private:
 
     // Audio encode / decode
     TaskHandle_t audio_loop_task_handle_ = nullptr;
+    TaskHandle_t ping_loop_task_handle_ = nullptr;
     BackgroundTask* background_task_ = nullptr;
     std::chrono::steady_clock::time_point last_output_time_;
     std::list<std::vector<uint8_t>> audio_decode_queue_;
@@ -123,6 +124,7 @@ private:
     void SetDecodeSampleRate(int sample_rate, int frame_duration);
     void CheckNewVersion();
     void CheckRealtileConfig();
+    void PingServer();
     void ShowActivationCode();
     void OnClockTimer();
     void SetListeningMode(ListeningMode mode);
