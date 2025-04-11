@@ -154,7 +154,7 @@ std::string Board::GetJson() {
 std::string Board::GetRealtimeJson() {
 	cJSON* json = cJSON_CreateObject();
 	cJSON_AddStringToObject(json, "user", GetUuid().c_str());
-	cJSON_AddNumberToObject(json, "tts_sample_rate", 32000);
+	cJSON_AddNumberToObject(json, "tts_sample_rate", 48000);
 	cJSON_AddNumberToObject(json, "stt_sample_rate", 16000);
 	std::string json_str = std::string(cJSON_Print(json));
 	cJSON_free(json);

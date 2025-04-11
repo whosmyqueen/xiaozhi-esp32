@@ -12,6 +12,7 @@
 #include <sstream>
 #include <vector>
 
+
 #define TAG "Realtime"
 
 Realtime::Realtime() {}
@@ -95,15 +96,15 @@ bool Realtime::PingRealtime() {
 		return false;
 	}
 
-	has_config_ = false;
 	cJSON* code = cJSON_GetObjectItem(root, "code");
 	cJSON* message = cJSON_GetObjectItem(root, "message");
 	if (code != NULL || message != NULL) {
-		ESP_LOGE(TAG, "Failed to ping realtime server: %s", message->valuestring);
-		cJSON_Delete(root);
-		return false;
+		if (code->type != cJSON_Number || code->valueint != 0) {
+			ESP_LOGE(TAG, "Failed to ping realtime server: %s", message->valuestring);
+			cJSON_Delete(root);
+			return false;
+		}
 	}
-
 	cJSON_Delete(root);
 	return true;
 }
