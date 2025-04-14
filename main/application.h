@@ -32,6 +32,7 @@
 #define AUDIO_INPUT_READY_EVENT (1 << 1)
 #define AUDIO_OUTPUT_READY_EVENT (1 << 2)
 #define CHECK_NEW_VERSION_DONE_EVENT (1 << 3)
+#define CHECK_REALTIME_CONFIG_DONE_EVENT (1 << 4)
 
 enum DeviceState {
     kDeviceStateUnknown,
@@ -127,12 +128,12 @@ private:
     void ResetDecoder();
     void SetDecodeSampleRate(int sample_rate, int frame_duration);
     void CheckNewVersion();
-    void CheckRealtileConfig();
-    void PingServer();
     void ShowActivationCode();
     void OnClockTimer();
     void SetListeningMode(ListeningMode mode);
     void AudioLoop();
+    void CheckRealtileConfig();
+    void PingServer();
 };
 
 #endif // _APPLICATION_H_

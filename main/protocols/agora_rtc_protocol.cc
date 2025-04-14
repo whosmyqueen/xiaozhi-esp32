@@ -23,11 +23,13 @@ void AgoraRtcProtocol::Start() { StartRtcClient(false); }
 void AgoraRtcProtocol::SendAudio(const std::vector<uint8_t>& data) {
 	if (engine_initd_ && engine_connected_ && engine_joined_) {
 		audio_frame_info_t audio_frame_info = {.data_type = AUDIO_DATA_TYPE_OPUS};
+		busy_sending_audio_ = true;
 		int rval = agora_rtc_send_audio_data(g_conn_id, data.data(), data.size(), &audio_frame_info);
 		if (rval < 0) {
 			ESP_LOGI(TAG, "Failed to send audio data, reason: %s\n", agora_rtc_err_2_str(rval));
 			SetError(Lang::Strings::SERVER_ERROR);
 		}
+		busy_sending_audio_ = false;
 	}
 }
 
@@ -38,6 +40,7 @@ bool AgoraRtcProtocol::OpenAudioChannel() {
 			return false;
 		}
 	}
+	busy_sending_audio_ = false;
 	error_occurred_ = false;
 	if (on_audio_channel_opened_ != nullptr) {
 		on_audio_channel_opened_();

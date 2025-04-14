@@ -1,4 +1,5 @@
 #include "realtime.h"
+#include "assets/lang_config.h"
 #include "board.h"
 #include "settings.h"
 #include "system_info.h"
@@ -15,7 +16,7 @@
 
 #define TAG "Realtime"
 
-Realtime::Realtime() {}
+Realtime::Realtime() { SetRealtileServerUrl(CONFIG_REALTIME_SERVER_URL); }
 
 Realtime::~Realtime() {}
 
@@ -26,15 +27,33 @@ void Realtime::SetHeader(const std::string& key, const std::string& value) { hea
 void Realtime::SetPostData(const std::string& post_data) { post_data_ = post_data; }
 
 bool Realtime::StartRealtime() {
-	auto http = Board::GetInstance().CreateHttp();
+	auto& board = Board::GetInstance();
+	auto app_desc = esp_app_get_description();
+
+	// Check if there is a new firmware version available
+	current_version_ = app_desc->version;
+	ESP_LOGI(TAG, "Current version: %s", current_version_.c_str());
+
+	if (realtime_server_base_url_.length() < 10) {
+		ESP_LOGE(TAG, "Realtime Server URL is not properly set");
+		return false;
+	}
+
+	auto http = board.CreateHttp();
 	for (const auto& header : headers_) {
 		http->SetHeader(header.first, header.second);
 	}
-
+	http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+	http->SetHeader("Client-Id", board.GetUuid());
+	http->SetHeader("Authorization", std::string("Bearer ") + std::string(CONFIG_SENSEFLOW_APP_KEY));
+	http->SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
+	http->SetHeader("Accept-Language", Lang::CODE);
 	http->SetHeader("Content-Type", "application/json");
-	std::string method = post_data_.length() > 0 ? "POST" : "GET";
+
+	std::string data = board.GetRealtimeJson();
+	std::string method = data.length() > 0 ? "POST" : "GET";
 	std::string url = realtime_server_base_url_ + std::string("realtime");
-	if (!http->Open(method, url, post_data_)) {
+	if (!http->Open(method, url, data)) {
 		ESP_LOGE(TAG, "Failed to open HTTP connection");
 		delete http;
 		return false;
@@ -72,11 +91,17 @@ bool Realtime::StartRealtime() {
 }
 
 bool Realtime::PingRealtime() {
-
-	auto http = Board::GetInstance().CreateHttp();
+	auto& board = Board::GetInstance();
+	auto app_desc = esp_app_get_description();
+	auto http = board.CreateHttp();
 	for (const auto& header : headers_) {
 		http->SetHeader(header.first, header.second);
 	}
+	http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+	http->SetHeader("Client-Id", board.GetUuid());
+	http->SetHeader("Authorization", std::string("Bearer ") + std::string(CONFIG_SENSEFLOW_APP_KEY));
+	http->SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
+	http->SetHeader("Accept-Language", Lang::CODE);
 	http->SetHeader("Content-Type", "application/json");
 	Settings settings("realtime_config", false);
 	std::string url =
