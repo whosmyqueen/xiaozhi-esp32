@@ -352,8 +352,7 @@ void Application::Start() {
 	board.StartNetwork();
 
 	// Check for new firmware version or get the MQTT broker address
-	display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
-	CheckNewVersion();
+	// CheckNewVersion();
 	CheckRealtileConfig();
 
 	// Initialize the protocol
@@ -379,10 +378,10 @@ void Application::Start() {
 	protocol_->OnAudioChannelOpened([this, codec, &board]() {
 		board.SetPowerSaveMode(false);
 		if (protocol_->server_sample_rate() != codec->output_sample_rate()) {
-			ESP_LOGW(TAG,
-			         "Server sample rate %d does not match device output sample rate %d, "
-			         "resampling may cause distortion",
-			         protocol_->server_sample_rate(), codec->output_sample_rate());
+			ESP_LOGW(
+			    TAG,
+			    "Server sample rate %d does not match device output sample rate %d, resampling may cause distortion",
+			    protocol_->server_sample_rate(), codec->output_sample_rate());
 		}
 		SetDecodeSampleRate(protocol_->server_sample_rate(), protocol_->server_frame_duration());
 		auto& thing_manager = iot::ThingManager::GetInstance();
@@ -540,8 +539,7 @@ void Application::Start() {
 #endif
 
 	// Wait for the new version check to finish
-	// xEventGroupWaitBits(event_group_, CHECK_NEW_VERSION_DONE_EVENT, pdTRUE, pdFALSE,
-	// portMAX_DELAY);
+	xEventGroupWaitBits(event_group_, CHECK_REALTIME_CONFIG_DONE_EVENT, pdTRUE, pdFALSE, portMAX_DELAY);
 	SetDeviceState(kDeviceStateIdle);
 	std::string message = std::string(Lang::Strings::VERSION) + ota_.GetCurrentVersion();
 	display->ShowNotification(message.c_str());
@@ -565,8 +563,7 @@ void Application::OnClockTimer() {
 		int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
 		ESP_LOGI(TAG, "Free internal: %u minimal internal: %u", free_sram, min_free_sram);
 
-		// If we have synchronized server time, set the status to clock "HH:MM" if the device is
-		// idle
+		// If we have synchronized server time, set the status to clock "HH:MM" if the device is idle
 		if (ota_.HasServerTime()) {
 			if (device_state_ == kDeviceStateIdle) {
 				Schedule([this]() {
