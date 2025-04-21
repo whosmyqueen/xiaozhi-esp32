@@ -539,6 +539,7 @@ void Application::Start() {
 #endif
 
 	// Wait for the new version check to finish
+	// xEventGroupWaitBits(event_group_, CHECK_NEW_VERSION_DONE_EVENT, pdTRUE, pdFALSE, portMAX_DELAY);
 	xEventGroupWaitBits(event_group_, CHECK_REALTIME_CONFIG_DONE_EVENT, pdTRUE, pdFALSE, portMAX_DELAY);
 	SetDeviceState(kDeviceStateIdle);
 	std::string message = std::string(Lang::Strings::VERSION) + ota_.GetCurrentVersion();
@@ -914,29 +915,41 @@ bool Application::CanEnterSleepMode() {
 void Application::CheckRealtileConfig() {
 	const int MAX_RETRY = 10;
 	int retry_count = 0;
+	int retry_delay = 10; // 初始重试延迟为10秒
 
 	while (true) {
+		SetDeviceState(kDeviceStateActivating);
+		auto display = Board::GetInstance().GetDisplay();
+		display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
+
 		if (!realtime_.StartRealtime()) {
 			retry_count++;
 			if (retry_count >= MAX_RETRY) {
-				ESP_LOGE(TAG, "Too many retries, exit start realtime config");
+				ESP_LOGE(TAG, "Too many retries, exit version check");
 				return;
 			}
-			ESP_LOGW(TAG, "Start Realtime failed, retry in %d seconds (%d/%d)", 60, retry_count, MAX_RETRY);
-			vTaskDelay(pdMS_TO_TICKS(60000));
+			ESP_LOGW(TAG, "Check new version failed, retry in %d seconds (%d/%d)", retry_delay, retry_count, MAX_RETRY);
+			for (int i = 0; i < retry_delay; i++) {
+				vTaskDelay(pdMS_TO_TICKS(1000));
+				if (device_state_ == kDeviceStateIdle) {
+					break;
+				}
+			}
+			retry_delay *= 2; // 每次重试后延迟时间翻倍
 			continue;
 		}
 		retry_count = 0;
+		retry_delay = 10; // 重置重试延迟时间
+
+		// No new version, mark the current version as valid
 		realtime_.MarkCurrentVersionValid();
 		xEventGroupSetBits(event_group_, CHECK_REALTIME_CONFIG_DONE_EVENT);
-		// Exit the loop if done checking new version
-		break;
 	}
 }
 
 void Application::PingServer() {
 	while (true) {
-		if (protocol_->IsAudioChannelOpened()) {
+		if (protocol_ && protocol_->IsAudioChannelOpened()) {
 			realtime_.PingRealtime();
 			ESP_LOGI(TAG, "Ping server...");
 		}

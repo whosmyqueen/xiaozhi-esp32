@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include "board.h"
 
 class Realtime {
 public:
@@ -28,6 +29,7 @@ private:
 	std::string current_version_;
 	std::string post_data_;
 	std::map<std::string, std::string> headers_;
+	Http* SetupHttp();
 };
 
 #endif // _OTA_H

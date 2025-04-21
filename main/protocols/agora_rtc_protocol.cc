@@ -110,17 +110,13 @@ bool AgoraRtcProtocol::StartRtcClient(bool report_error) {
 
 	channel_options.auto_subscribe_audio = true;
 	channel_options.auto_subscribe_video = false;
-	channel_options.audio_codec_opt.audio_codec_type = AUDIO_CODEC_DISABLED;
+	channel_options.audio_codec_opt.audio_codec_type = AUDIO_CODEC_TYPE_OPUS;
 	channel_options.audio_codec_opt.pcm_sample_rate = 16000;
 	channel_options.audio_codec_opt.pcm_channel_num = 1;
 	channel_options.audio_codec_opt.pcm_duration = OPUS_FRAME_DURATION_MS;
 	const char* version = agora_rtc_get_version();
 	ESP_LOGI(TAG, "start join room\n");
 	ESP_LOGI(TAG, "agora version: %s\n", version);
-	ESP_LOGI(TAG, "room_user_id: %d", room_user_id_);
-	ESP_LOGI(TAG, "app_id: %s", app_id_.c_str());
-	ESP_LOGI(TAG, "token: %s", token_.c_str());
-	ESP_LOGI(TAG, "channel_name: %s", channel_name_.c_str());
 	rval = agora_rtc_join_channel(g_conn_id, channel_name_.c_str(), room_user_id_, token_.c_str(), &channel_options);
 	if (rval < 0) {
 		ESP_LOGI(TAG, "Failed to join channel, reason: %s \n", agora_rtc_err_2_str(rval));

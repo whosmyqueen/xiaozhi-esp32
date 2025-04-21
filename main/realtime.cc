@@ -13,14 +13,15 @@
 #include <sstream>
 #include <vector>
 
-
 #define TAG "Realtime"
 
 Realtime::Realtime() { SetRealtileServerUrl(CONFIG_REALTIME_SERVER_URL); }
 
 Realtime::~Realtime() {}
 
-void Realtime::SetRealtileServerUrl(std::string realtime_server_base_url) { realtime_server_base_url_ = realtime_server_base_url; }
+void Realtime::SetRealtileServerUrl(std::string realtime_server_base_url) {
+	realtime_server_base_url_ = realtime_server_base_url;
+}
 
 void Realtime::SetHeader(const std::string& key, const std::string& value) { headers_[key] = value; }
 
@@ -35,20 +36,11 @@ bool Realtime::StartRealtime() {
 	ESP_LOGI(TAG, "Current version: %s", current_version_.c_str());
 
 	if (realtime_server_base_url_.length() < 10) {
-		ESP_LOGE(TAG, "Realtime Server URL is not properly set");
+		ESP_LOGE(TAG, "Realtime URL is not properly set");
 		return false;
 	}
 
-	auto http = board.CreateHttp();
-	for (const auto& header : headers_) {
-		http->SetHeader(header.first, header.second);
-	}
-	http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
-	http->SetHeader("Client-Id", board.GetUuid());
-	http->SetHeader("Authorization", std::string("Bearer ") + std::string(CONFIG_SENSEFLOW_APP_KEY));
-	http->SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
-	http->SetHeader("Accept-Language", Lang::CODE);
-	http->SetHeader("Content-Type", "application/json");
+	auto http = SetupHttp();
 
 	std::string data = board.GetRealtimeJson();
 	std::string method = data.length() > 0 ? "POST" : "GET";
@@ -56,56 +48,60 @@ bool Realtime::StartRealtime() {
 	if (!http->Open(method, url, data)) {
 		ESP_LOGE(TAG, "Failed to open HTTP connection");
 		delete http;
-		return false;
+		return ESP_FAIL;
 	}
 
 	auto response = http->GetBody();
-	http->Close();
 	delete http;
+
 	cJSON* root = cJSON_Parse(response.c_str());
 	if (root == NULL) {
 		ESP_LOGE(TAG, "Failed to parse JSON response");
-		return false;
+		return ESP_FAIL;
 	}
 
 	has_config_ = false;
 	cJSON* code = cJSON_GetObjectItem(root, "code");
 	cJSON* message = cJSON_GetObjectItem(root, "message");
-	if (code == NULL && message == NULL) {
-		Settings settings("realtime_config", true);
-		cJSON* app_id = cJSON_GetObjectItem(root, "app_id");
-		cJSON* channel_name = cJSON_GetObjectItem(root, "channel_name");
-		cJSON* token = cJSON_GetObjectItem(root, "token");
-		cJSON* room_user_id = cJSON_GetObjectItem(root, "room_user_id");
-		cJSON* user = cJSON_GetObjectItem(root, "user");
-		settings.SetString("app_id", app_id->valuestring);
-		settings.SetString("channel_name", channel_name->valuestring);
-		settings.SetString("token", token->valuestring);
-		settings.SetInt("room_user_id", room_user_id->valueint);
-		settings.SetString("user", user->valuestring);
-		has_config_ = true;
+	Settings settings("realtime_config", true);
+	if (code != NULL && message != NULL) {
+		settings.EraseAll();
+		cJSON_Delete(root);
+		ESP_LOGE(TAG, "Failed to start Realtime Config");
+		return ESP_FAIL;
 	}
+	cJSON* app_id = cJSON_GetObjectItem(root, "app_id");
+	cJSON* channel_name = cJSON_GetObjectItem(root, "channel_name");
+	cJSON* token = cJSON_GetObjectItem(root, "token");
+	cJSON* room_user_id = cJSON_GetObjectItem(root, "room_user_id");
+	cJSON* user = cJSON_GetObjectItem(root, "user");
+	settings.SetString("app_id", app_id->valuestring);
+	settings.SetString("channel_name", channel_name->valuestring);
+	settings.SetString("token", token->valuestring);
+	settings.SetInt("room_user_id", room_user_id->valueint);
+	settings.SetString("user", user->valuestring);
+	has_config_ = true;
 
 	cJSON_Delete(root);
-	return true;
+	return ESP_OK;
 }
 
 bool Realtime::PingRealtime() {
-	auto& board = Board::GetInstance();
 	auto app_desc = esp_app_get_description();
-	auto http = board.CreateHttp();
-	for (const auto& header : headers_) {
-		http->SetHeader(header.first, header.second);
+
+	// Check if there is a new firmware version available
+	current_version_ = app_desc->version;
+	ESP_LOGI(TAG, "Current version: %s", current_version_.c_str());
+
+	if (realtime_server_base_url_.length() < 10) {
+		ESP_LOGE(TAG, "Realtime URL is not properly set");
+		return false;
 	}
-	http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
-	http->SetHeader("Client-Id", board.GetUuid());
-	http->SetHeader("Authorization", std::string("Bearer ") + std::string(CONFIG_SENSEFLOW_APP_KEY));
-	http->SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
-	http->SetHeader("Accept-Language", Lang::CODE);
-	http->SetHeader("Content-Type", "application/json");
+	auto http = SetupHttp();
+
 	Settings settings("realtime_config", false);
-	std::string url =
-	    realtime_server_base_url_ + "realtime/" + settings.GetString("channel_name") + "/ping?user=" + settings.GetString("user");
+	std::string url = realtime_server_base_url_ + "realtime/" + settings.GetString("channel_name") +
+	                  "/ping?user=" + settings.GetString("user");
 	if (!http->Open("GET", url)) {
 		ESP_LOGE(TAG, "Failed to open HTTP connection");
 		delete http;
@@ -152,4 +148,23 @@ void Realtime::MarkCurrentVersionValid() {
 		ESP_LOGI(TAG, "Marking firmware as valid");
 		esp_ota_mark_app_valid_cancel_rollback();
 	}
+}
+
+Http* Realtime::SetupHttp() {
+	auto& board = Board::GetInstance();
+	auto app_desc = esp_app_get_description();
+
+	auto http = board.CreateHttp();
+	for (const auto& header : headers_) {
+		http->SetHeader(header.first, header.second);
+	}
+
+	http->SetHeader("Device-Id", SystemInfo::GetMacAddress().c_str());
+	http->SetHeader("Client-Id", board.GetUuid());
+	http->SetHeader("Authorization", std::string("Bearer ") + std::string(CONFIG_SENSEFLOW_APP_KEY));
+	http->SetHeader("User-Agent", std::string(BOARD_NAME "/") + app_desc->version);
+	http->SetHeader("Accept-Language", Lang::CODE);
+	http->SetHeader("Content-Type", "application/json");
+
+	return http;
 }
