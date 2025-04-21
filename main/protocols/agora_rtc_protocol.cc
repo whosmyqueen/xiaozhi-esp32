@@ -18,7 +18,7 @@ AgoraRtcProtocol::~AgoraRtcProtocol() {
 	instance_ = NULL;
 }
 
-void AgoraRtcProtocol::Start() { StartRtcClient(false); }
+bool AgoraRtcProtocol::Start() { return StartRtcClient(false); }
 
 void AgoraRtcProtocol::SendAudio(const std::vector<uint8_t>& data) {
 	if (engine_initd_ && engine_connected_ && engine_joined_) {
@@ -90,7 +90,8 @@ bool AgoraRtcProtocol::StartRtcClient(bool report_error) {
 	service_opt.domain_limit = false;
 	int rval = agora_rtc_init(app_id_.c_str(), &handler, &service_opt);
 	if (rval < 0) {
-		ESP_LOGI(TAG, "Failed to initialize Agora sdk, app_id: %s, reason: %s\n", app_id_.c_str(), agora_rtc_err_2_str(rval));
+		ESP_LOGI(TAG, "Failed to initialize Agora sdk, app_id: %s, reason: %s\n", app_id_.c_str(),
+		         agora_rtc_err_2_str(rval));
 		SetError(Lang::Strings::SERVER_ERROR);
 		return ESP_FAIL;
 	}
@@ -131,20 +132,21 @@ void AgoraRtcProtocol::_on_join_channel_success(connection_id_t conn_id, uint32_
 	ESP_LOGI(TAG, "__on_join_channel_success\n");
 	connection_info_t conn_info = {0};
 	agora_rtc_get_connection_info(conn_id, &conn_info);
-	ESP_LOGI(TAG, "[conn-%lu] Join the channel %s successfully, uid %lu elapsed %d ms\n", conn_id, conn_info.channel_name, uid, elapsed);
+	ESP_LOGI(TAG, "[conn-%lu] Join the channel %s successfully, uid %lu elapsed %d ms\n", conn_id,
+	         conn_info.channel_name, uid, elapsed);
 	instance_->engine_joined_ = true;
 	xEventGroupSetBits(instance_->event_group_handle_, JOIN_EVENT_BIT);
 }
 
-void AgoraRtcProtocol::_on_audio_data(connection_id_t conn_id, const uint32_t uid, uint16_t sent_ts, const void* data, size_t len,
-                                      const audio_frame_info_t* info_ptr) {
+void AgoraRtcProtocol::_on_audio_data(connection_id_t conn_id, const uint32_t uid, uint16_t sent_ts, const void* data,
+                                      size_t len, const audio_frame_info_t* info_ptr) {
 	if (instance_ != nullptr && instance_->on_incoming_audio_ != nullptr) {
 		instance_->on_incoming_audio_(std::vector<uint8_t>((uint8_t*)data, (uint8_t*)data + len));
 		instance_->last_incoming_time_ = std::chrono::steady_clock::now();
 	}
 }
 
-void AgoraRtcProtocol::_on_stream_message(connection_id_t conn_id, uint32_t uid, int stream_id, const char* data, size_t length,
-                                          uint64_t sent_ts) {
+void AgoraRtcProtocol::_on_stream_message(connection_id_t conn_id, uint32_t uid, int stream_id, const char* data,
+                                          size_t length, uint64_t sent_ts) {
 	ESP_LOGI(TAG, "[conn-%lu] on_stream_message: %s\n", conn_id, data);
 }

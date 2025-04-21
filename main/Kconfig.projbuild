@@ -232,14 +232,12 @@ config USE_REALTIME_CHAT
         需要 ESP32 S3 与 AEC 开启，因为性能不够，不建议和微信聊天界面风格同时开启
 
 config REALTIME_SERVER_URL
-    depends on CONNECTION_TYPE_AGORA_RTC
     string "Realtime Server URL"
     default "https://rtc.senseflow-test.sensetime.com/api/"
     help
         Realtime Server Base Url.
 
 config SENSEFLOW_APP_KEY
-    depends on CONNECTION_TYPE_AGORA_RTC
     string "Senseflow App Key"
     default "app-2N0KwAz2KEO1tc0e2ElxGbPl"
     help

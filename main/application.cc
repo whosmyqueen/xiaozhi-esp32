@@ -356,12 +356,10 @@ void Application::Start() {
 	/* Wait for the network to be ready */
 	board.StartNetwork();
 
-	// Check for new firmware version or get the MQTT broker address
-	// CheckNewVersion();
 	CheckRealtileConfig();
 
     // Check for new firmware version or get the MQTT broker address
-    CheckNewVersion();
+    // CheckNewVersion();
 
     // Initialize the protocol
     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
@@ -371,8 +369,8 @@ void Application::Start() {
     } else if (ota_.HasWebsocketConfig()) {
         protocol_ = std::make_unique<WebsocketProtocol>();
     } else {
-        ESP_LOGW(TAG, "No protocol specified in the OTA config, using MQTT");
-        protocol_ = std::make_unique<MqttProtocol>();
+        ESP_LOGW(TAG, "No protocol specified in the OTA config, using AgoraRtc");
+        protocol_ = std::make_unique<AgoraRtcProtocol>();
     }
 
     protocol_->OnNetworkError([this](const std::string& message) {
@@ -956,7 +954,7 @@ void Application::CheckRealtileConfig() {
 
 		// No new version, mark the current version as valid
 		realtime_.MarkCurrentVersionValid();
-		xEventGroupSetBits(event_group_, CHECK_REALTIME_CONFIG_DONE_EVENT);
+		xEventGroupSetBits(event_group_, CHECK_NEW_VERSION_DONE_EVENT);
 	}
 }
 
