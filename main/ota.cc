@@ -154,6 +154,8 @@ bool Ota::CheckVersion() {
         cJSON_ArrayForEach(item, websocket) {
             if (item->type == cJSON_String) {
                 settings.SetString(item->string, item->valuestring);
+            } else if (item->type == cJSON_Number) {
+                settings.SetInt(item->string, item->valueint);
             }
         }
         has_websocket_config_ = true;
@@ -378,7 +380,6 @@ bool Ota::IsNewVersionAvailable(const std::string& currentVersion, const std::st
 
 std::string Ota::GetActivationPayload() {
     if (!has_serial_number_) {
-        ESP_LOGI(TAG, "No serial number found");
         return "{}";
     }
 
