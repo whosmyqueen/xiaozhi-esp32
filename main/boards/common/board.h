@@ -18,7 +18,6 @@ class Board {
 private:
     Board(const Board&) = delete; // 禁用拷贝构造函数
     Board& operator=(const Board&) = delete; // 禁用赋值操作
-    virtual std::string GetBoardJson() = 0;
 
 protected:
     Board();
@@ -50,6 +49,7 @@ public:
     virtual std::string GetJson();
     virtual std::string GetRealtimeJson();
     virtual void SetPowerSaveMode(bool enabled) = 0;
+    virtual std::string GetBoardJson() = 0;
 };
 
 #define DECLARE_BOARD(BOARD_CLASS_NAME) \
