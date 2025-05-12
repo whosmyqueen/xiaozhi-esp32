@@ -354,22 +354,24 @@ void Application::Start() {
 	}
 	codec->Start();
 
-	xTaskCreatePinnedToCore(
-	    [](void* arg) {
-		    Application* app = (Application*)arg;
-		    app->AudioLoop();
-		    vTaskDelete(NULL);
-	    },
-	    "audio_loop", 4096 * 2, this, 8, &audio_loop_task_handle_, realtime_chat_enabled_ ? 1 : 0);
-	xTaskCreatePinnedToCore(
-	    [](void* arg) {
-		    Application* app = (Application*)arg;
-		    app->PingServer();
-		    vTaskDelete(NULL);
-	    },
-	    "ping_realtime_server", 4096 * 2, this, 4, &ping_loop_task_handle_, 0);
-	/* Wait for the network to be ready */
-	board.StartNetwork();
+#if CONFIG_USE_AUDIO_PROCESSOR
+    xTaskCreatePinnedToCore([](void* arg) {
+        Application* app = (Application*)arg;
+        app->AudioLoop();
+        vTaskDelete(NULL);
+    }, "audio_loop", 4096 * 2, this, 8, &audio_loop_task_handle_, 1);
+#else
+    xTaskCreate([](void* arg) {
+        Application* app = (Application*)arg;
+        app->AudioLoop();
+        vTaskDelete(NULL);
+    }, "audio_loop", 4096 * 2, this, 8, &audio_loop_task_handle_);
+#endif
+	xTaskCreatePinnedToCore([](void* arg) {
+	    Application* app = (Application*)arg;
+		app->PingServer();
+		vTaskDelete(NULL);
+	}, "ping_realtime_server", 4096 * 2, this, 4, &ping_loop_task_handle_, 0);
 
 	CheckRealtileConfig();
 
@@ -503,7 +505,7 @@ void Application::Start() {
     });
     bool protocol_started = protocol_->Start();
 
-    audio_processor_->Initialize(codec, realtime_chat_enabled_);
+    audio_processor_->Initialize(codec);
     audio_processor_->OnOutput([this](std::vector<int16_t>&& data) {
         background_task_->Schedule([this, data = std::move(data)]() mutable {
             if (protocol_->IsAudioChannelBusy()) {

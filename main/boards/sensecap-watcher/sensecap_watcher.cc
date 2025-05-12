@@ -95,6 +95,7 @@ private:
     esp_lcd_panel_io_handle_t panel_io_ = nullptr;
     esp_lcd_panel_handle_t panel_ = nullptr;
     uint32_t long_press_cnt_;
+    button_driver_t* btn_driver_ = nullptr;
     static SensecapWatcher* instance_;
 
     void InitializePowerSaveTimer() {
@@ -230,11 +231,6 @@ private:
         ESP_LOGI(TAG, "Knob initialized with pins A:%d B:%d", BSP_KNOB_A_PIN, BSP_KNOB_B_PIN);
     }
 
-    // 添加一个静态成员实例指针，用于按钮回调
-    static uint8_t GetKnobButtonLevel(button_driver_t *button_driver) {
-        return instance_->IoExpanderGetLevel(BSP_KNOB_BTN);
-    }
-
     void InitializeButton() {
         // 设置静态实例指针
         instance_ = this;
@@ -242,19 +238,20 @@ private:
         // watcher 是通过长按滚轮进行开机的, 需要等待滚轮释放, 否则用户开机松手时可能会误触成单击
         ESP_LOGI(TAG, "waiting for knob button release");
         while(IoExpanderGetLevel(BSP_KNOB_BTN) == 0) {
-            vTaskDelay(50 / portTICK_PERIOD_MS);
+            vTaskDelay(pdMS_TO_TICKS(50));
         }
 
         button_config_t btn_config = {
             .long_press_time = 2000,
-            .short_press_time = 50
+            .short_press_time = 0
         };
-        button_driver_t btn_driver = {
-            .enable_power_save = false,
-            .get_key_level = GetKnobButtonLevel
+        btn_driver_ = (button_driver_t*)calloc(1, sizeof(button_driver_t));
+        btn_driver_->enable_power_save = false;
+        btn_driver_->get_key_level = [](button_driver_t *button_driver) -> uint8_t {
+            return !instance_->IoExpanderGetLevel(BSP_KNOB_BTN);
         };
         
-        ESP_ERROR_CHECK(iot_button_create(&btn_config, &btn_driver, &btns));
+        ESP_ERROR_CHECK(iot_button_create(&btn_config, btn_driver_, &btns));
         
         iot_button_register_cb(btns, BUTTON_SINGLE_CLICK, nullptr, [](void* button_handle, void* usr_data) {
             auto self = static_cast<SensecapWatcher*>(usr_data);
